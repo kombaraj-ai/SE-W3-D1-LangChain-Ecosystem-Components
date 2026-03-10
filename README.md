@@ -1513,7 +1513,6 @@ print(f"Created {len(docs)} documents manually")
 for doc in docs:
     print(f"→ {doc.page_content}")
 ```
-
 ---
 
 ### Common Document Loaders Cheat Sheet
