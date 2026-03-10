@@ -2164,320 +2164,392 @@ for q in questions:
 > - Add memory to make it a full conversational RAG chatbot
 
 # Assignment
-## LangChain + Ollama + Sarvam-1 LLM
+
+## LangChain + Ollama Chat App 
+
+A minimal chat application built with **LangChain**, **Ollama**, and the
+`llama3.2:1b` model, demonstrating the classic `ChatPromptTemplate → LLM → StrOutputParser` chain pattern.
 
 ---
 
-## 🤔 What is Sarvam-1?
+## Table of Contents
 
-Sarvam-1 is a **2-billion parameter language model** specifically optimized for Indian languages. It provides best-in-class performance in **10 Indic languages** — Bengali, Gujarati, Hindi, Kannada, Malayalam, Marathi, Odia, Punjabi, **Tamil (ta)**, and Telugu — when compared with popular models like Gemma-2-2B and Llama-3.2-3B.
-
----
-
-## 📋 Prerequisites
-
-- Python >= 3.11
-- `uv` package manager
-- Ollama installed
-- ~1.5 GB free disk space
-
----
-
-## Step 1: Install Ollama
-
-```bash
-# Windows → Download from: https://ollama.com/download
-```
+1. [Prerequisites](#1-prerequisites)
+2. [Install uv](#2-install-uv)
+3. [Set Up the Project](#3-set-up-the-project)
+4. [Pull the Ollama Model](#4-pull-the-ollama-model)
+5. [Code Walkthrough](#5-code-walkthrough)
+6. [Full Source Code](#6-full-source-code)
+7. [Run the Application](#7-run-the-application)
+8. [Expected Output](#8-expected-output)
+9. [How It Works (Architecture)](#9-how-it-works-architecture)
+10. [Common Errors and Fixes](#10-common-errors-and-fixes)
+11. [Next Steps](#11-next-steps)
 
 ---
 
-## Step 2: Download Sarvam-1 Locally
+## 1. Prerequisites
+
+| Requirement | Minimum version | Notes |
+|-------------|----------------|-------|
+| Python | 3.9+ | `python --version` |
+| Ollama | latest | https://ollama.com |
+| uv | latest | Replaces pip — fast Python package manager |
+
+Make sure the **Ollama daemon is running** before you start:
 
 ```bash
-# Terminal 1 — Start the Ollama server
-ollama serve
+ollama serve          # starts the local API on http://localhost:11434
 ```
+
+---
+
+## 2. Install uv
+
+`uv` is a blazing-fast Python package and project manager written in Rust.
+It replaces `pip`, `pip-tools`, `virtualenv`, and more — with a single binary.
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Verify the installation:
+```bash
+uv --version
+```
+
+> **Why uv instead of pip?**  
+> `uv` resolves and installs packages **10–100x faster** than pip, manages
+> virtual environments automatically, and produces reproducible lockfiles —
+> all with a single tool.
+
+---
+
+## 3. Set Up the Project
+
+### Option A — Virtual environment (recommended)
 
 ```bash
-# Terminal 2 — Pull Sarvam-1 model (~1.5 GB)
-ollama pull mashriram/sarvam-1
+# Create a new project folder
+mkdir langchain-ollama-chat && cd langchain-ollama-chat
+
+# Create a virtual environment
+uv venv
+
+# Activate it
+.venv\Scripts\activate           # Windows
+
+# Install dependencies
+uv add langchain langchain-ollama langchain-core
 ```
 
-**Download progress:**
-```
-pulling manifest
-pulling 9eb283c30bba... 100% ▕████████████████▏ 1.5 GB
-pulling 49e4b8c42abb... 100% ▕████████████████▏  33 B
-verifying sha256 digest
-writing manifest
-✅ success
-```
+`uv add` installs packages and records them in `pyproject.toml` automatically.
 
-### Verify Download
+### Option B — Inline run (no setup needed)
 
 ```bash
-# List all downloaded models
+uv run --with langchain --with langchain-ollama --with langchain-core \
+    python langchain_ollama_chat.py
+```
+
+`uv run` creates a temporary environment, installs the packages, runs the script, then cleans up.
+
+| Package | Purpose |
+|---------|---------|
+| `langchain` | Core framework and chain abstractions |
+| `langchain-ollama` | `ChatOllama` integration for local models |
+| `langchain-core` | `ChatPromptTemplate`, `StrOutputParser` |
+
+---
+
+## 4. Pull the Ollama Model
+
+```bash
+ollama pull llama3.2:1b
+```
+
+This downloads the **1-billion-parameter** Llama 3.2 model (~800 MB).
+Verify it is available:
+
+```bash
 ollama list
 ```
 
-```
-NAME                        ID            SIZE    MODIFIED
-mashriram/sarvam-1:latest   abc123xyz     1.5 GB  Just now
-```
-
-### Quick Test in Terminal
-
-```bash
-# Test Sarvam-1 directly — Tamil text completion
-ollama run mashriram/sarvam-1 "தமிழ்நாட்டின் தலைநகரம்"
-```
-
-**Expected output:**
-```
-சென்னை ஆகும்.
-```
-
 ---
 
-## Step 3: Setup Python Project with `uv`
+## 5. Code Walkthrough
 
-```bash
-# Create project folder
-mkdir sarvam-tamil
-cd sarvam-tamil
-
-# Initialize uv project
-uv init
-
-# Create virtual environment
-uv venv
-
-# Activate virtual environment
-# macOS / Linux:
-source .venv/bin/activate
-
-# Windows:
-.venv\Scripts\activate
-```
-
----
-
-## Step 4: Install Dependencies
-
-```bash
-uv add langchain
-uv add langchain-community
-uv add langchain-ollama
-```
-
-**Your `pyproject.toml`:**
-```toml
-[project]
-name = "sarvam-tamil"
-version = "0.1.0"
-requires-python = ">=3.11"
-dependencies = [
-    "langchain>=0.3.0",
-    "langchain-community>=0.3.0",
-    "langchain-ollama>=0.2.0",
-]
-```
-
----
-
-## Step 5: Hello World Application
-
-Create `hello_sarvam.py`:
+### Step 5.1 — Import Libraries
 
 ```python
-# hello_sarvam.py
-# =====================================================
-# Hello World — LangChain + Ollama + Sarvam-1 (Tamil)
-# =====================================================
-# NOTE: Sarvam-1 is a TEXT COMPLETION model.
-# It continues/completes the text you provide.
-# We use Ollama (not ChatOllama) for this reason.
-# =====================================================
-
-from langchain_community.llms import Ollama
-from langchain_core.prompts import PromptTemplate
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
-print("=" * 50)
-print("  🇮🇳 Sarvam-1 Tamil Hello World — LangChain")
-print("=" * 50)
-
-# ── Step 1: Load Sarvam-1 via Ollama ─────────────────
-llm = Ollama(
-    model="mashriram/sarvam-1",
-    temperature=0.3,       # Low = more focused completions
-    num_predict=60,        # Max tokens to generate
-)
-
-# ── Step 2: Create a Prompt Template ─────────────────
-# Sarvam-1 completes text — so we give it an
-# incomplete Tamil sentence to finish.
-
-prompt = PromptTemplate.from_template("{tamil_text}")
-
-# ── Step 3: Build the Chain ───────────────────────────
-chain = prompt | llm | StrOutputParser()
-
-# ── Step 4: Tamil Text Completion Examples ────────────
-tamil_inputs = [
-    "தமிழ்நாட்டின் தலைநகரம் சென்னை",
-    "திருக்குறள் இயற்றியவர் திருவள்ளுவர். இது",
-    "தமிழ் மொழி உலகின் மிகவும் பழமையான மொழிகளில்",
-    "மெரினா கடற்கரை உலகின் இரண்டாவது நீண்ட கடற்கரை.",
-]
-
-print("\n📝 தமிழ் உரை நிறைவு (Tamil Text Completion):\n")
-
-for text in tamil_inputs:
-    print(f"📥 உள்ளீடு  : {text}")
-    result = chain.invoke({"tamil_text": text})
-    print(f"📤 நிறைவு   : {result.strip()}")
-    print("-" * 50)
 ```
+
+- **`ChatOllama`** — wraps the local Ollama API as a LangChain chat model.
+- **`ChatPromptTemplate`** — builds a prompt from a single template string with `{placeholders}`.
+- **`StrOutputParser`** — converts the raw `AIMessage` object into a plain Python string.
 
 ---
 
-## Step 6: Run the Application
-
-```bash
-python hello_sarvam.py
-```
-
----
-
-## Bonus: Interactive Tamil Completion Loop
-
-Create `interactive_sarvam.py`:
+### Step 5.2 — Initialise the LLM
 
 ```python
-# interactive_sarvam.py
-# Sarvam-1 as a Thirukkural expert — completes Tamil text
-# Few-shot: உரை = 4 words | நிறைவு = 3 words
+llm = ChatOllama(
+    model="llama3.2:1b",
+    temperature=0.7,
+)
+```
 
-from langchain_community.llms import Ollama
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `model` | `"llama3.2:1b"` | Selects the model pulled in Step 4 |
+| `temperature` | `0.7` | Balances creativity vs. determinism (0 = fully deterministic, 1 = most creative) |
+
+Ollama runs locally at `http://localhost:11434` by default — no API key needed.
+
+---
+
+### Step 5.3 — Build the Prompt Template
+
+```python
+prompt = ChatPromptTemplate.from_template(
+    "You are a helpful, concise assistant. Answer clearly and briefly.\n\n"
+    "User: {user_input}\n"
+    "Assistant:"
+)
+```
+
+- `from_template()` accepts a **single formatted string** with `{placeholder}` variables.
+- The system instruction, user turn, and assistant cue are all embedded in one template.
+- `{user_input}` is the only variable — it is substituted when the chain is invoked.
+- Compare with `from_messages()`: that version uses explicit role tuples; `from_template()`
+  is simpler when you want everything in one string.
+
+---
+
+### Step 5.4 — Add an Output Parser
+
+```python
+parser = StrOutputParser()
+```
+
+LangChain LLMs return an `AIMessage` object.
+`StrOutputParser` extracts just the `.content` string so you receive plain text — no further unwrapping needed.
+
+---
+
+### Step 5.5 — Compose the Chain (LCEL)
+
+```python
+chain = prompt | llm | parser
+```
+
+This is LangChain’s **LCEL (LangChain Expression Language)** pipe syntax.
+Each `|` passes the output of one component as the input of the next, similar to Unix pipes:
+
+```
+user_input  -->  prompt  -->  llm  -->  parser  -->  plain string
+```
+
+To invoke the chain:
+
+```python
+response = chain.invoke({"user_input": "What is the capital of France?"})
+# response == "The capital of France is Paris."
+```
+
+---
+
+### Step 5.6 — Interactive Chat Loop
+
+```python
+def chat():
+    print("=" * 50)
+    print("  LangChain + Ollama Chat  (llama3.2:1b)")
+    print("  Type 'exit' or 'quit' to stop.")
+    print("=" * 50)
+
+    while True:
+        try:
+            user_input = input("\nYou: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+
+        if not user_input:
+            continue
+
+        if user_input.lower() in {"exit", "quit"}:
+            print("Goodbye!")
+            break
+
+        response = chain.invoke({"user_input": user_input})
+        print(f"\nAssistant: {response}")
+```
+
+- Reads input from the terminal in a loop.
+- Skips empty input gracefully.
+- Handles `Ctrl+C` cleanly via `KeyboardInterrupt`.
+- Passes each message through the chain and prints the plain-string response.
+- Exits when the user types `exit` or `quit`.
+
+> **Note:** This is a *single-turn* chat — the model does not retain memory of
+> previous messages between turns. See [Next Steps](#11-next-steps) to add memory.
+
+---
+
+## 6. Full Source Code
+
+Save this as **`langchain_ollama_chat.py`**:
+
+```python
+# langchain_ollama_chat.py
+# A simple LangChain chat application using Ollama with llama3.2:1b
+
+from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-llm = Ollama(
-    model="mashriram/sarvam-1",
-    temperature=0.3,
-    num_predict=80,
+
+# ── 1. Model ────────────────────────────────────────────────────────────────────────────────
+llm = ChatOllama(
+    model="llama3.2:1b",
+    temperature=0.7,
 )
 
+# ── 2. Prompt Template ────────────────────────────────────────────────────────────────────
 prompt = ChatPromptTemplate.from_template(
-    "நீங்கள் ஒரு உலகப் புகழ்பெற்ற தமிழ் நீதி நூல் திருக்குறள் நிபுணர். "
-    "கொடுக்கப்பட்ட தமிழ் உரையை திருக்குறள் அறிவின் அடிப்படையில் "
-    "இயற்கையாக தொடர்ந்து நிறைவு செய்யுங்கள்.\n\n"
-
-    "திருக்குறள் அமைப்பு முதல் வரியில் 4 வார்த்தைகளும், "
-    "இரண்டாவது வரியில் 3 வார்த்தைகளும்.\n\n"
-
-    "--- எடுத்துக்காட்டுகள் (Few-Shot Examples) ---\n\n"
-
-    "உரை:    அகர முதல எழுத்தெல்லாம் ஆதி\n"
-    "நிறைவு: பகவன் முதற்றே உலகு.\n\n"
-
-    "உரை:    கற்க கசடறக் கற்பவை கற்றபின்\n"
-    "நிறைவு: நிற்க அதற்குத் தக.\n\n"
-
-    "உரை:    யாகாவாராயினும் நாகாக்க காவாக்கால்\n"
-    "நிறைவு: சோகாப்பர் சொல்லால் சொல்.\n\n"
-
-    "உரை:    அன்புடைமை ஆன்ற குடிப்பிறத்தல் இவ்விரண்டும்\n"
-    "நிறைவு: செல்வத்துள் செல்வம் சேர்க்கும்.\n\n"
-
-    "உரை:    ஒழுக்கம் விழுப்பம் தரலான் ஒழுக்கம்\n"
-    "நிறைவு: உயிரினும் ஓம்பப் படும்.\n\n"
-
-    "--- இப்போது நிறைவு செய்யுங்கள் ---\n\n"
-
-    "உரை:    {text}\n"
-    "நிறைவு:"
+    "You are a helpful, concise assistant. Answer clearly and briefly.\n\n"
+    "User: {user_input}\n"
+    "Assistant:"
 )
 
-chain = prompt | llm | StrOutputParser()
+# ── 3. Output Parser ──────────────────────────────────────────────────────────────────────
+parser = StrOutputParser()
 
-print("=" * 55)
-print("  🇮🇳 Sarvam-1 — திருக்குறள் நிபுணர்")
-print("  Thirukkural Expert — Tamil Completion")
-print("  உரை    → 4 வார்த்தைகள் (First Line)")
-print("  நிறைவு → 3 வார்த்தைகள் (Second Line)")
-print("  Type 'exit' to quit")
-print("=" * 55)
+# ── 4. Chain  (prompt | llm | parser) ──────────────────────────────────────────────────────────
+chain = prompt | llm | parser
 
-while True:
-    user_input = input("\n📥 உரை (4 வார்த்தைகள்) : ").strip()
 
-    if not user_input:
-        continue
+# ── 5. Chat loop ───────────────────────────────────────────────────────────────────────────────
+def chat():
+    print("=" * 50)
+    print("  LangChain + Ollama Chat  (llama3.2:1b)")
+    print("  Type 'exit' or 'quit' to stop.")
+    print("=" * 50)
 
-    if user_input.lower() == "exit":
-        print("\nநன்றி! வணக்கம் 👋")
-        break
+    while True:
+        try:
+            user_input = input("\nYou: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
 
-    result = chain.invoke({"text": user_input})
-    print(f"📤 நிறைவு (3 வார்த்தைகள்) : {result.strip()}")
+        if not user_input:
+            continue
+
+        if user_input.lower() in {"exit", "quit"}:
+            print("Goodbye!")
+            break
+
+        # Invoke the chain
+        response = chain.invoke({"user_input": user_input})
+        print(f"\nAssistant: {response}")
+
+
+if __name__ == "__main__":
+    chat()
 ```
 
+---
 
+## 7. Run the Application
+
+**Terminal**
 ```bash
-python interactive_sarvam.py
+# Option A: activated uv venv
+.venv\Scripts\activate           # Windows
+python langchain_ollama_chat.py
+
+# Option B: uv run (no activation needed)
+uv run --with langchain --with langchain-ollama --with langchain-core \
+    python langchain_ollama_chat.py
 ```
 
 ---
 
-## Project Structure
+## 8. Expected Output
 
 ```
-sarvam-tamil/
-├── .venv/                    # Virtual environment (uv)
-├── pyproject.toml            # Project config
-├── uv.lock                   # Locked dependencies
-├── hello_sarvam.py           # Main hello world app
-└── interactive_sarvam.py     # Interactive completion loop
+==================================================
+  LangChain + Ollama Chat  (llama3.2:1b)
+  Type 'exit' or 'quit' to stop.
+==================================================
+
+You: What is Python?
+
+Assistant: Python is a high-level, interpreted programming language known
+for its clean syntax and readability. It supports multiple paradigms
+including object-oriented, functional, and procedural styles.
+
+You: exit
+Goodbye!
 ```
 
 ---
 
-## Quick Reference
+## 9. How It Works (Architecture)
 
+```
+Input string
+    |
+    v
+ChatPromptTemplate.from_template()   <-- injects {user_input} into the template string
+    |
+    v
+ChatOllama (llama3.2:1b)             <-- sends request to local Ollama API
+    |                                    receives AIMessage back
+    v
+StrOutputParser                      <-- extracts .content string from AIMessage
+    |
+    v
+Plain string response
+```
+
+The `|` operator in LCEL wires component I/O together:
+
+| Step | Input | Output |
+|------|-------|--------|
+| `ChatPromptTemplate` | `dict` with `{user_input}` key | `ChatPromptValue` |
+| `ChatOllama` | `ChatPromptValue` | `AIMessage` |
+| `StrOutputParser` | `AIMessage` | `str` |
+
+---
+
+## 10. Common Errors and Fixes
+
+**`Connection refused` / `httpx.ConnectError`** — Ollama is not running.
 ```bash
-# Ollama commands
-ollama serve                       # Start Ollama server
-ollama pull mashriram/sarvam-1     # Download Sarvam-1
-ollama list                        # List models
-ollama run mashriram/sarvam-1      # Test in terminal
-ollama rm mashriram/sarvam-1       # Remove model
-
-# uv commands
-uv venv                            # Create virtual env
-source .venv/bin/activate          # Activate (Mac/Linux)
-uv add <package>                   # Install a package
-python hello_sarvam.py             # Run the app
+ollama serve
 ```
 
+**`model 'llama3.2:1b' not found`** — Model has not been pulled yet.
+```bash
+ollama pull llama3.2:1b
+```
+
+**`ModuleNotFoundError: No module named 'langchain_ollama'`** — Missing packages.
+```bash
+uv add langchain langchain-ollama langchain-core
+```
+
+**`KeyError: 'user_input'`** — The key passed to `chain.invoke()` must exactly match
+the placeholder name in the template string (e.g. `{user_input}`).
+
+**Slow first response** — Normal. The model loads into memory on the first call; later turns are faster.
+
 ---
 
-## ⚠️ Key Differences — Sarvam-1 vs Chat Models
-
-| Feature | Sarvam-1 | llama3.2 / ChatOllama |
-|---|---|---|
-| **Type** | Text Completion | Chat / Instruction |
-| **LangChain class** | `Ollama` | `ChatOllama` |
-| **Input** | Incomplete text | Full question |
-| **Output** | Continues the text | Answers the question |
-| **Best for** | Indian language text | Conversations / Q&A |
-| **Model Size** | 1.5 GB | 2 GB |
-
----
-
-> 💡 **Summary:**  
-> - Sarvam-1 is India's own LLM — great for Tamil and 9 other Indian languages  
-> - Use `Ollama` class (not `ChatOllama`) since it is a text-completion model  
-> - Give it an **incomplete Tamil sentence** — it will complete it naturally  
-> - Only ~1.5 GB — runs easily on a laptop!
