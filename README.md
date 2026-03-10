@@ -1,4 +1,4 @@
-# Week 3 -> Day 1 -> LangChain EcoSystem and Components
+# Week 3 -> Day 1 -> LangChain Ecosystem and Components
 
 ---
 
