@@ -2235,6 +2235,9 @@ uv --version
 mkdir langchain-ollama-chat 
 cd langchain-ollama-chat
 
+# Initialize uv project (creates pyproject.toml)
+uv init
+
 # Create a virtual environment
 uv venv
 
