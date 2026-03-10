@@ -2477,7 +2477,7 @@ python hello_sarvam.py             # Run the app
 
 ---
 
-> 💡 **சுருக்கம் (Summary):**  
+> 💡 **Summary:**  
 > - Sarvam-1 is India's own LLM — great for Tamil and 9 other Indian languages  
 > - Use `Ollama` class (not `ChatOllama`) since it is a text-completion model  
 > - Give it an **incomplete Tamil sentence** — it will complete it naturally  
