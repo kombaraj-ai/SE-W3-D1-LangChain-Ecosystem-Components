@@ -2232,7 +2232,8 @@ uv --version
 
 ```bash
 # Create a new project folder
-mkdir langchain-ollama-chat && cd langchain-ollama-chat
+mkdir langchain-ollama-chat 
+cd langchain-ollama-chat
 
 # Create a virtual environment
 uv venv
