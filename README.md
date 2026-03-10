@@ -1100,7 +1100,7 @@ uv venv
 source .venv/bin/activate
 
 # On Windows:
-.venv\Scripts\activate
+.\.venv\Scripts\activate
 ```
 
 ---
@@ -2242,7 +2242,7 @@ uv init
 uv venv
 
 # Activate it
-.venv\Scripts\activate           # Windows
+.\.venv\Scripts\activate           # Windows
 
 # Install dependencies
 uv add langchain langchain-ollama langchain-core
@@ -2475,7 +2475,7 @@ if __name__ == "__main__":
 **Terminal**
 ```bash
 # Option A: activated uv venv
-.venv\Scripts\activate           # Windows
+.\.venv\Scripts\activate         # Windows
 python langchain_ollama_chat.py
 
 # Option B: uv run (no activation needed)
