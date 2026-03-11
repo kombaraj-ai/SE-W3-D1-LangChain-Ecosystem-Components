@@ -5,6 +5,7 @@
 
 1. [What is LangChain?](#1-what-is-langchain)
 2. [LangChain Ecosystem](#2-langchain-ecosystem)
+    *   [LangChain Import Restructuring Explained](#langchain-import-restructuring-explained)
 3. [LangChain Components](#3-langchain-components)
    - [Data Connection](#31-data-connection)
    - [Model I/O](#32-model-io)
@@ -255,6 +256,110 @@ os.environ["LANGCHAIN_PROJECT"] = "my-langchain-project"
 ```
 
 ---
+## LangChain Import Restructuring Explained
+LangChain originally shipped as a **single monolithic package** (`langchain`). Everything lived together — LLMs, vector stores, embeddings, document loaders, etc.
+
+```
+langchain/
+├── vectorstores/     ← FAISS, Pinecone, Chroma...
+├── llms/             ← OpenAI, Anthropic, Cohere...
+├── embeddings/       ← OpenAIEmbeddings...
+├── document_loaders/ ← PDFLoader, CSVLoader...
+```
+
+This was convenient early on, but created serious problems as the ecosystem grew.
+
+---
+
+## The Problem with the Old Approach
+
+### 1. Dependency Bloat
+
+Installing `langchain` pulled in dependencies for *every* integration, even ones you never used. Want just FAISS? You still got the Pinecone SDK, the Chroma client, Cohere's library, etc. installed.
+
+### 2. Version Conflicts
+
+If Pinecone updated their SDK in a breaking way, it could break your `langchain` install even if you never used Pinecone. Every integration's release cycle was coupled to the core library.
+
+### 3. Maintenance Scaling Problem
+
+The LangChain team couldn't keep up with maintaining 100+ third-party integrations inside one repo. Each integration needed its own testing, versioning, and bug fixes.
+
+---
+
+## The Solution: Package Splitting
+
+LangChain restructured into a **modular architecture**:
+
+```
+langchain-core          ← Abstract base classes, interfaces (no 3rd party deps)
+langchain               ← Orchestration logic (chains, agents, etc.)
+langchain-community     ← Community-maintained integrations (FAISS, Pinecone, Chroma)
+langchain-[provider]    ← Official first-party integrations
+    ├── langchain-openai
+    ├── langchain-anthropic
+    ├── langchain-google-genai
+    └── langchain-aws
+```
+
+---
+
+## What This Means for FAISS Specifically
+
+| Version | Import Path | Status |
+|---|---|---|
+| Old (< 0.1) | `from langchain.vectorstores import FAISS` | ❌ Deprecated |
+| Transitional | `from langchain_community.vectorstores import FAISS` | ⚠️ Works, but warned |
+| Modern | `from langchain_community.vectorstores import FAISS` + `pip install faiss-cpu` | ✅ Correct |
+
+FAISS moved to `langchain-community` because it's a community-maintained integration, not an official LangChain-partnered provider.
+
+---
+
+## The Import Error Explained
+
+```python
+# This fails in modern LangChain:
+from langchain.vectorstores import FAISS
+# ImportError: cannot import name 'FAISS' from 'langchain.vectorstores'
+```
+
+What's happening under the hood:
+
+```
+langchain.vectorstores  →  This module still EXISTS (for backward compat)
+                           but it no longer CONTAINS FAISS directly.
+                           The class was physically moved to langchain_community.
+```
+
+LangChain tried to ease migration by keeping stub modules, but eventually removed or emptied them — hence the `ImportError`.
+
+---
+
+## The Fix
+
+```bash
+pip install langchain-community faiss-cpu
+```
+
+```python
+# ✅ Correct modern import
+from langchain_community.vectorstores import FAISS
+```
+
+---
+
+## Why This Design is Better
+
+```
+Before:  pip install langchain        → installs 50+ SDKs you don't need
+After:   pip install langchain-openai → installs ONLY OpenAI dependencies
+         pip install langchain-community faiss-cpu → ONLY what FAISS needs
+```
+
+Each package now has its own release cadence, so a breaking change in one provider doesn't affect others. This is the standard pattern modern Python ecosystems follow — similar to how `requests`, `httpx`, and `aiohttp` are separate HTTP libraries rather than one giant package.
+
+
 
 ## 3. LangChain Components
 
