@@ -341,11 +341,14 @@ LangChain tried to ease migration by keeping stub modules, but eventually remove
 ```bash
 pip install langchain-community faiss-cpu
 ```
+Note: Hyphens are allowed in package distribution names.
 
 ```python
 # ✅ Correct modern import
 from langchain_community.vectorstores import FAISS
 ```
+Note: langchain_community is the actual Python package folder created after installation.
+      Python module names cannot contain hyphens (-). So Underscore should be used.
 
 ---
 
@@ -359,7 +362,17 @@ After:   pip install langchain-openai → installs ONLY OpenAI dependencies
 
 Each package now has its own release cadence, so a breaking change in one provider doesn't affect others. This is the standard pattern modern Python ecosystems follow — similar to how `requests`, `httpx`, and `aiohttp` are separate HTTP libraries rather than one giant package.
 
+## Best Practice:
+Always try to use official packages if available, otherwise use community driven packages. 
+For example, HuggingFace + LangChain officially has package called "langchain-huggingface" use it instead of "langchain-community"
 
+```
+# ⚠️ Old / transitional — works but not recommended
+from langchain_community.embeddings import HuggingFaceEmbeddings
+
+# ✅ Modern best practice
+from langchain_huggingface import HuggingFaceEmbeddings
+```
 
 ## 3. LangChain Components
 
